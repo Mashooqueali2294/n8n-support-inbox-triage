@@ -1,0 +1,87 @@
+{
+  "name": "Support Inbox Triage - Daily Summary",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 24, "triggerAtHour": 8 }]
+        }
+      },
+      "id": "node-cron-101",
+      "name": "Schedule: Daily 8AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "ticket_log",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "node-cron-sheets-102",
+      "name": "Sheets: Read All Tickets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [420, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "CRED_SHEETS", "name": "Google Sheets (OAuth2)" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Daily Summary Aggregator ─────────────────────────\nconst allRows = $input.all().map(i => i.json);\n\nconst now   = new Date();\nconst since = new Date(now.getTime() - 24 * 60 * 60 * 1000);\n\nconst last24h = allRows.filter(r => {\n  if (!r.createdAt) return false;\n  return new Date(r.createdAt) >= since;\n});\n\n// Total count\nconst total = last24h.length;\n\n// Category breakdown\nconst byCategory = {};\nfor (const r of last24h) {\n  const cat = r.category ?? 'unknown';\n  byCategory[cat] = (byCategory[cat] ?? 0) + 1;\n}\n\n// Priority breakdown\nconst byPriority = {};\nfor (const r of last24h) {\n  const pri = r.priority ?? 'unknown';\n  byPriority[pri] = (byPriority[pri] ?? 0) + 1;\n}\n\n// Top 3 keywords (simple frequency from subject+message)\nconst wordFreq = {};\nconst stopWords = new Set(['the','a','an','is','it','to','of','and','in','for','on','with','i','my','me','we','our','you','your','this','that','was','have','has','be','are','at','but','by','from']);\nfor (const r of last24h) {\n  const words = `${r.subject ?? ''} ${r.message ?? ''}`.toLowerCase().match(/\\b[a-z]{3,}\\b/g) ?? [];\n  for (const w of words) {\n    if (!stopWords.has(w)) wordFreq[w] = (wordFreq[w] ?? 0) + 1;\n  }\n}\nconst topKeywords = Object.entries(wordFreq)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 3)\n  .map(([word, count]) => `\"${word}\" (${count})`);\n\n// Build report\nconst report = [\n  `📊 DAILY SUPPORT SUMMARY – ${now.toDateString()}`,\n  `${'='.repeat(45)}`,\n  ``,\n  `📨 Total Tickets (last 24h): ${total}`,\n  ``,\n  `📂 By Category:`,\n  ...Object.entries(byCategory).map(([k,v]) => `   • ${k}: ${v}`),\n  ``,\n  `⚡ By Priority:`,\n  ...Object.entries(byPriority).map(([k,v]) => `   • ${k}: ${v}`),\n  ``,\n  `🔑 Top 3 Keywords:`,\n  ...(topKeywords.length ? topKeywords.map(kw => `   • ${kw}`) : ['   (no data)']),\n  ``,\n  `${'='.repeat(45)}`,\n  `Generated at ${now.toISOString()}`\n].join('\\n');\n\nreturn [{ json: { report, total, byCategory, byPriority, topKeywords, generatedAt: now.toISOString() } }];"
+      },
+      "id": "node-cron-agg-103",
+      "name": "Aggregate: Build Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.NOTIFY_EMAIL }}",
+        "subject": "=[Support Daily Summary] {{ $json.total }} ticket(s) in last 24h – {{ $json.generatedAt.slice(0,10) }}",
+        "emailType": "text",
+        "message": "={{ $json.report }}",
+        "options": {}
+      },
+      "id": "node-cron-gmail-104",
+      "name": "Gmail: Send Daily Summary",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [860, 300],
+      "credentials": {
+        "gmailOAuth2": { "id": "CRED_GMAIL", "name": "Gmail (OAuth2)" }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule: Daily 8AM": {
+      "main": [[{ "node": "Sheets: Read All Tickets", "type": "main", "index": 0 }]]
+    },
+    "Sheets: Read All Tickets": {
+      "main": [[{ "node": "Aggregate: Build Summary", "type": "main", "index": 0 }]]
+    },
+    "Aggregate: Build Summary": {
+      "main": [[{ "node": "Gmail: Send Daily Summary", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "versionId": "v1-daily-summary",
+  "id": "daily-summary-workflow",
+  "tags": [{ "id": "tag-1", "name": "support" }, { "id": "tag-2", "name": "purple-merit-assessment" }]
+}

@@ -1,0 +1,115 @@
+{
+  "name": "Support Inbox Triage - Main",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "support-ticket",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-001",
+      "name": "Webhook: Intake",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "support-ticket-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst body = raw.body ?? raw;\n\nconst required = ['ticketId', 'name', 'email', 'subject', 'message', 'source'];\nconst missing = required.filter(f => !body[f] || String(body[f]).trim() === '');\n\nif (missing.length > 0) {\n  return [{ json: { __isValid: 'no', accepted: false, error: 'Missing fields: ' + missing.join(', '), fields: missing } }];\n}\n\nconst emailRx = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (!emailRx.test(body.email)) {\n  return [{ json: { __isValid: 'no', accepted: false, error: 'Invalid email: ' + body.email } }];\n}\n\nreturn [{ json: { ...body, __isValid: 'yes' } }];"
+      },
+      "id": "node-validate-002",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-val",
+              "leftValue": "={{ $json.__isValid }}",
+              "rightValue": "yes",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "node-if-valid-003",
+      "name": "IF: Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "ticket_log",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "node-sheets-read-005",
+      "name": "Sheets: Read Ticket Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [860, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ accepted: false, error: $json.error, fields: $json.fields }) }}",
+        "options": { "responseCode": 400 }
+      },
+      "id": "node-respond-invalid-004",
+      "name": "Respond: 400 Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [860, 440]
+    },
+    {
+      "parameters": {
+        "jsCode": "const incomingId = String($('Validate Input').first().json.ticketId).trim().toLowerCase();\n\nconst rows = $items(\"Sheets: Read Ticket Log\", 0);\n\nconst isDuplicate = rows.some(item => {\n  const id = String(item.json.ticketId || item.json.ticketid || '').trim().toLowerCase();\n  return id && id === incomingId;\n});\n\nconst ticket = $('Validate Input').first().json;\n\nreturn [{\n  json: {\n    ...ticket,\n    __isNew: isDuplicate ? 'no' : 'yes'\n  }\n}];"
+      },
+      "id": "node-dup-check-006",
+      "name": "Check Duplicate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 200]
+    },
+
+    // 👇👇👇 BAQI SAB SAME HAI (UNCHANGED) 👇👇👇
+
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-dup",
+              "leftValue": "={{ $json.__isNew }}",
+              "rightValue": "yes",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "node-if-dup-007",
+      "name": "IF: Is New Ticket?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1300, 200]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n_support_triage
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5678}
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE:-false}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-changeme}
+      - GENERIC_TIMEZONE=Asia/Karachi
+      - TZ=Asia/Karachi
+      - N8N_COMMUNITY_PACKAGES_ENABLED=true
+      - GOOGLE_SHEET_ID=${GOOGLE_SHEET_ID}
+      - NOTIFY_EMAIL=${NOTIFY_EMAIL}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./custom-node:/opt/custom-node
+
+volumes:
+  n8n_data:
+    driver: local

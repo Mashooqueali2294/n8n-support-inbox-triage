@@ -1,0 +1,43 @@
+{
+  "name": "n8n-nodes-ticket-classifier",
+  "version": "1.0.0",
+  "description": "Custom n8n node: classifies support tickets by category and priority using keyword rules",
+  "keywords": ["n8n-community-node-package"],
+  "license": "MIT",
+  "homepage": "",
+  "author": {
+    "name": "Mashooque",
+    "email": "mashooque.automation@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mashooque/n8n-nodes-ticket-classifier"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "ts-node nodes/TicketClassifierNode/TicketClassifierNode.node.test.ts",
+    "lint": "eslint nodes --ext .ts",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [],
+    "nodes": [
+      "dist/nodes/TicketClassifierNode/TicketClassifierNode.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^18.16.0",
+    "typescript": "^5.1.6",
+    "ts-node": "^10.9.1",
+    "n8n-workflow": "*"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}

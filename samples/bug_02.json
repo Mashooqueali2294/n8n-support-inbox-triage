@@ -1,0 +1,1 @@
+{"ticketId":"TCK_2004","name":"Fatima Raza","email":"fatima.raza@startup.pk","subject":"Export feature not working correctly","message":"The CSV export feature is broken. When I click Export, it freezes for 10 seconds and then gives an exception. The report file is not downloaded. This issue has been happening for 2 days.","source":"website"}
